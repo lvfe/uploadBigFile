@@ -5,30 +5,52 @@ import * as fs from 'fs';
 
 function App() {
   let file;
+  let size = 40;
+  let chunklist = [];
   return (
     <div className="App">
       <input type="file" onChange={handlefileChange}/>
       <button onClick={(_)=>handleClick()}>upload</button>
     </div>
   );
-  function handleClick(){
-    const formData=new FormData();
-    formData.append("chunk", "")
-    formData.append("file", file);
-    formData.append("filename", file.name)
-    console.log(formData);
-    request({
-      url:'http://localhost:3000/uploader', 
-      data:formData,
+  async function handleClick(){
+    let requests = chunklist.map((item, index)=>{
+      return {
+        chunk: item.file,
+        hash: file.name+'-'+index
+      }
+    }).map(({chunk, hash}, index)=>{
+      const formData=new FormData();
+      formData.append("chunk", chunk)
+      formData.append("filename", file.name)
+      formData.append("hash", hash)
+      request({
+        url:'http://localhost:3000/uploader', 
+        data:formData,
+        headers: {},
+        method: 'POST'
+      }).then(res=>{
+        console.log('loaded');
+      })
+    })
+
+    await Promise.all(requests);
+    await request({
+      url:'http://localhost:3000/merge', 
+      data:file.name,
       headers: {},
       method: 'POST'
-    }).then(res=>{
-      console.log('loaded');
-    })
+    });
+    
   }
   function handlefileChange(event){
     [file] = event.target.files
-    console.log(1, file);
+    chunklist = [];
+    let cur = 0;
+    while(cur<file.size){
+      chunklist.push({file:file.slice(cur, cur+size)})
+      cur+=size;
+    }
   }
 }
 
